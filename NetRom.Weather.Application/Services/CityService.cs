@@ -11,11 +11,14 @@ public class CityService : ICityService
     //Hint: Este foarte similar cu CityService
     //Extra: Configuration EF.
     private IList<CityModel> _cityModels;
+    private readonly IWeatherService _weatherService;
+
     private IMapper _mapper { get; set; }
 
-    public CityService(IMapper mapper)
+    public CityService(IMapper mapper, IWeatherService weatherService)
     {
         _mapper = mapper;
+        _weatherService = weatherService;
         _cityModels = new List<CityModel>()
         {
             new()
@@ -62,6 +65,11 @@ public class CityService : ICityService
 
     public async Task<IEnumerable<CityModel>> GetAllAsync()
     {
+        foreach (var city in _cityModels)
+        {
+            var cityWeather = await _weatherService.GetWeatherAsync(city.Latitude, city.Longitude);
+            city.Temperature = cityWeather.Main?.Temp;
+        }
         return await Task.FromResult(_cityModels);
     }
 

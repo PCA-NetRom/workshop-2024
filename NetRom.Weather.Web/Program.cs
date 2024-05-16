@@ -1,10 +1,14 @@
 using NetRom.Weather.Application;
+using NetRom.Weather.Application.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 builder.Services.AddApplicationServices();
+
+builder.Services.Configure<WeatherApiOptions>(builder.Configuration.GetSection("OpenWeather"));
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
