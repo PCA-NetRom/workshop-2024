@@ -5,7 +5,10 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
-builder.Services.AddApplicationServices();
+
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
+builder.Services.AddApplicationServices(connectionString);
 
 builder.Services.Configure<WeatherApiOptions>(builder.Configuration.GetSection("OpenWeather"));
 

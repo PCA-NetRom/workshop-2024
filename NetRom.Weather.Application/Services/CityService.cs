@@ -1,5 +1,8 @@
 ﻿using AutoMapper;
 using NetRom.Weather.Application.Models;
+using NetRom.Weather.Core.Entities;
+using NetRom.Weather.Core.Persistance;
+using System.Threading;
 
 namespace NetRom.Weather.Application.Services;
 
@@ -10,88 +13,59 @@ public class CityService : ICityService
     //Note: Repository-ul face parte din infrastructura. Nu uitati sa il adaugati la DI container.
     //Hint: Este foarte similar cu CityService
     //Extra: Configuration EF.
-    private IList<CityModel> _cityModels;
     private readonly IWeatherService _weatherService;
-
+    private readonly IRepository<City> _repository;
     private IMapper _mapper { get; set; }
 
-    public CityService(IMapper mapper, IWeatherService weatherService)
+    public CityService(IMapper mapper, IWeatherService weatherService, IRepository<City> repository)
     {
         _mapper = mapper;
         _weatherService = weatherService;
-        _cityModels = new List<CityModel>()
-        {
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Name = "Craiova",
-                Latitude = 1,
-                Longitude = 21,
-                Temperature = 43
-            },
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Name = "Rm Valcea",
-                Latitude = 1,
-                Longitude = 34,
-                Temperature = 12
-            },
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Name = "Bucuresti",
-                Latitude = 21,
-                Longitude = 211,
-                Temperature = 2
-            },
-        };
+        _repository = repository;
     }
 
-    public Task<Guid> CreateAsync(CityModelForCreation cityModelForCreation)
+    public async Task<Guid> CreateAsync(CityModelForCreation cityModelForCreation, CancellationToken cancellationToken = default)
     {
-        //Note: Nu avem id. 
-        //Note: Putem genera unul in mapare/profil?
-        var newCity = _mapper.Map<CityModel>(cityModelForCreation);
+        var result = await _repository.CreateAsync(_mapper.Map<City>(cityModelForCreation), cancellationToken);
+        await _repository.SaveChangesAsync(cancellationToken);
 
-        _cityModels.Add(newCity);
-        return Task.FromResult(newCity.Id);
+        return result.Id;
     }
 
-    public async Task DeleteAsync(Guid cityId)
+    public async Task DeleteAsync(Guid cityId, CancellationToken cancellationToken = default)
     {
-        _cityModels = await Task.FromResult(_cityModels.Where(c => c.Id != cityId).ToList());
+        await _repository.DeleteAsync(new City { Id = cityId }, cancellationToken);
+        await _repository.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<IEnumerable<CityModel>> GetAllAsync()
+    public async Task<IEnumerable<CityModel>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        foreach (var city in _cityModels)
+        var cities = await _repository.GetAllAsync(cancellationToken);
+        var cityModels = _mapper.Map<IEnumerable<CityModel>>(cities);
+
+        foreach (var city in cityModels)
         {
             var cityWeather = await _weatherService.GetWeatherAsync(city.Latitude, city.Longitude);
             city.Temperature = cityWeather.Main?.Temp;
         }
-        return await Task.FromResult(_cityModels);
+        return cityModels;
     }
 
-    public async Task<CityModel?> GetByIdAsync(Guid cityId)
+    public async Task<CityModel?> GetByIdAsync(Guid cityId, CancellationToken cancellationToken = default)
     {
-        var cityModel = await Task.FromResult(_cityModels.FirstOrDefault(c => c.Id == cityId));
+        var city = await _repository.GetByIdAsync(cityId, cancellationToken);
+        var cityModel = _mapper.Map<CityModel>(city);
         return cityModel;
     }
 
-    public async Task<CityModel> UpdateAsync(CityModel cityModel)
+    public async Task<CityModel> UpdateAsync(CityModel cityModel, CancellationToken cancellationToken = default)
     {
-        var entity = _cityModels.FirstOrDefault(c => c.Id == cityModel.Id);
+        var city = _mapper.Map<City>(cityModel);
 
-        if (entity == null)
-        {
-            throw new Exception("Orasul nu exita");
-        }
+        await _repository.UpdateAsync(city, cancellationToken);
 
-        entity.Name = cityModel.Name;
-        entity.Latitude = cityModel.Latitude;
-        entity.Longitude = cityModel.Longitude;
+        await _repository.SaveChangesAsync(cancellationToken);
 
-        return await Task.FromResult(cityModel);
+        return cityModel;
     }
 }
